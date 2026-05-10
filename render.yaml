@@ -1,0 +1,29 @@
+services:
+  - type: web
+    name: btp-engine-core
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    region: oregon
+    plan: starter
+    envVars:
+      - key: BTP_ENGINE_TOKEN
+        generateValue: true
+      - key: OPENAI_ENABLED
+        value: false
+      - key: GPT_ENABLED
+        value: false
+      - key: GEMINI_ENABLED
+        value: false
+      - key: VISION_API_ENABLED
+        value: false
+      - key: LOVABLE_GATEWAY_ENABLED
+        value: false
+      - key: DB_WRITES_ENABLED
+        value: false
+      - key: DST_PUSH_ENABLED
+        value: false
+      - key: PROD_ACCESS_ENABLED
+        value: false
+      - key: MAX_COST_USD
+        value: "0.0"
+    healthCheckPath: /health
