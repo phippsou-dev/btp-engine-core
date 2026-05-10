@@ -2,61 +2,122 @@ name: Materialize BTP Engine Core
 
 on:
   push:
-    branches:
-      - main
     paths:
-      - "_bootstrap/btp_engine_core.part_*"
+      - "_bootstrap/**"
       - ".github/workflows/materialize-btp-engine-core.yml"
+  workflow_dispatch:
 
 permissions:
   contents: write
+  actions: read
 
 jobs:
   materialize:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
-      - name: Rebuild archive and materialize repository
-        shell: bash
+      - name: Validate bootstrap manifest
         run: |
           set -euo pipefail
+          test -f _bootstrap/manifest.json
+          python3 - <<'PY'
+          import json, pathlib, sys
+          m = json.loads(pathlib.Path("_bootstrap/manifest.json").read_text())
+          assert isinstance(m.get("chunk_count"), int) and m["chunk_count"] > 0
+          for i in range(m["chunk_count"]):
+              p = pathlib.Path(f"_bootstrap/btp_engine_core.part_{i:03d}")
+              if not p.exists():
+                  raise SystemExit(f"missing chunk {p}")
+              if p.read_text().strip().startswith("{{CHUNK_"):
+                  raise SystemExit(f"placeholder chunk still present: {p}")
+          print("manifest OK", m["chunk_count"])
+          PY
 
-          echo "Rebuilding archive from chunks..."
-          cat _bootstrap/btp_engine_core.part_* > /tmp/btp-engine-core.tar.gz.b64
-          base64 -d /tmp/btp-engine-core.tar.gz.b64 > /tmp/btp-engine-core.tar.gz
+      - name: Rebuild archive from chunks
+        run: |
+          set -euo pipefail
+          rm -f /tmp/btp_engine_core.b64 /tmp/btp_engine_core.tar.gz
 
-          echo "Extracting archive into repository root..."
-          tar -xzf /tmp/btp-engine-core.tar.gz -C .
+          CHUNK_COUNT=$(python3 - <<'PY'
+          import json
+          print(json.load(open("_bootstrap/manifest.json"))["chunk_count"])
+          PY
+          )
 
-          echo "Cleaning bootstrap chunks..."
+          for i in $(seq -f "%03g" 0 $((CHUNK_COUNT - 1))); do
+            cat "_bootstrap/btp_engine_core.part_${i}" >> /tmp/btp_engine_core.b64
+          done
+
+          base64 -d /tmp/btp_engine_core.b64 > /tmp/btp_engine_core.tar.gz
+
+          python3 - <<'PY'
+          import json, hashlib, pathlib
+          m = json.loads(pathlib.Path("_bootstrap/manifest.json").read_text())
+          actual = hashlib.sha256(pathlib.Path("/tmp/btp_engine_core.tar.gz").read_bytes()).hexdigest()
+          expected = m["archive_sha256"]
+          if actual != expected:
+              raise SystemExit(f"archive sha mismatch: {actual} != {expected}")
+          print("archive sha OK", actual)
+          PY
+
+      - name: Extract archive to repo root
+        run: |
+          set -euo pipefail
+          tar -xzf /tmp/btp_engine_core.tar.gz -C .
+
+      - name: Validate materialized tree
+        run: |
+          set -euo pipefail
+          test -f README.md
+          test -f pyproject.toml
+          test -f requirements.txt
+          test -f scripts/run_engine.py
+          test -d src/btp_engine
+          test -d tests
+          test -d docs
+          test -f src/btp_engine/guardrails/safety_checks.py
+          test -f src/btp_engine/classification/document_classifier.py
+          test -f src/btp_engine/analysis/problem_detector.py
+          test -f src/btp_engine/tasks/task_generator.py
+          test -f src/btp_engine/dst/dst_mapper.py
+          test -f src/btp_engine/scoring/baseline_validator.py
+
+      - name: Security scan
+        run: |
+          set -euo pipefail
+          ! grep -R "ghp_\|github_pat_\|sk-\|OPENAI_API_KEY\|SUPABASE_SERVICE_ROLE" . --exclude-dir=.git
+          ! find . \( -name "*.pdf" -o -name "*.zip" -o -name ".env*" \) ! -path "./.git/*" | grep .
+
+      - name: Run tests
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          python -m pip install pytest
+          if python -m pip install -e .; then
+            pytest -q
+          else
+            PYTHONPATH=src pytest -q
+          fi
+
+      - name: Remove bootstrap after successful materialization
+        run: |
+          set -euo pipefail
           rm -rf _bootstrap
 
-          echo "Safety scan..."
-          if grep -R "ghp_[a-zA-Z0-9_]\{10,\}\|github_pat_[a-zA-Z0-9_]\{10,\}\|sk-[a-zA-Z0-9_]\{10,\}" . --exclude-dir=.git --exclude-dir=tests --exclude="*.py" 2>/dev/null; then
-            echo "Possible secret detected. Aborting."
-            exit 1
-          fi
-
-          if find . \( -name "*.pdf" -o -name "*.zip" \) ! -path "./.git/*" | grep .; then
-            echo "Forbidden file detected. Aborting."
-            exit 1
-          fi
-
-          echo "Committing materialized repo..."
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
+      - name: Commit materialized repository
+        run: |
+          set -euo pipefail
+          git config user.name "btp-engine-materializer"
+          git config user.email "actions@github.com"
           git add -A
-
           if git diff --cached --quiet; then
-            echo "Nothing to commit."
-            exit 0
+            echo "No changes to commit"
+          else
+            git commit -m "materialize complete BTP Engine Core from bootstrap"
+            git push
           fi
-
-          git commit -m "feat: materialize complete BTP Engine Core"
-          git push
