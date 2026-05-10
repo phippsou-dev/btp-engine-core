@@ -6,6 +6,11 @@ class BTPEngineError(Exception):
     pass
 
 
+class GuardrailViolation(BTPEngineError):
+    """Raised when a guardrail check fails."""
+    pass
+
+
 class SafetyViolationError(BTPEngineError):
     """Raised when a safety check fails."""
     pass
