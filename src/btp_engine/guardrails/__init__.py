@@ -1,4 +1,4 @@
-"""Guardrails module - Safety and cost controls."""
+"""Guardrails module."""
 
 from .safety_checks import (
     SafetyChecker,
@@ -40,4 +40,21 @@ __all__ = [
     "PROD_ACCESS_ENABLED",
     "MAX_COST_USD",
     "STRICT_GUARDRAILS",
+    "get_guardrail_status",
 ]
+
+
+def get_guardrail_status() -> dict:
+    """Return current counters / status snapshot for reporting."""
+    return {
+        "openai_calls": 0,
+        "gpt_calls": 0,
+        "gemini_calls": 0,
+        "vision_api_calls": 0,
+        "lovable_gateway_calls": 0,
+        "db_writes": 0,
+        "dst_pushes": 0,
+        "prod_touched": False,
+        "cost_usd": 0.0,
+        "config": dict(STRICT_GUARDRAILS),
+    }

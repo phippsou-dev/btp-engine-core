@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "btp-engine-core"
-version = "0.1.0"
+version = "0.2.0"
 description = "BTP Engine Core - Document processing pipeline for MyHome construction projects"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -17,7 +17,6 @@ dependencies = [
     "pdfplumber>=0.10.0",
     "pytesseract>=0.3.10",
     "Pillow>=10.0.0",
-    "python-magic>=0.4.27",
 ]
 
 [project.optional-dependencies]
@@ -28,6 +27,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
