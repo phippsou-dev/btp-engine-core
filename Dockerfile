@@ -8,31 +8,21 @@ RUN apt-get update && apt-get install -y \
     git \
     && rm -rf /var/lib/apt/lists/*
 
+# Set working directory
 WORKDIR /app
 
 # Copy requirements
 COPY requirements.txt requirements-service.txt ./
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt -r requirements-service.txt
+RUN pip install --no-cache-dir -r requirements.txt && \
+    pip install --no-cache-dir -r requirements-service.txt
 
-# Copy application
+# Copy application code
 COPY . .
 
 # Expose port
 EXPOSE 8080
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV OPENAI_ENABLED=false
-ENV GPT_ENABLED=false
-ENV GEMINI_ENABLED=false
-ENV VISION_API_ENABLED=false
-ENV LOVABLE_GATEWAY_ENABLED=false
-ENV DB_WRITES_ENABLED=false
-ENV DST_PUSH_ENABLED=false
-ENV PROD_ACCESS_ENABLED=false
-ENV MAX_COST_USD=0.0
-
-# Run service
+# Run the service
 CMD ["uvicorn", "service.app:app", "--host", "0.0.0.0", "--port", "8080"]

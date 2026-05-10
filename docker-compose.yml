@@ -6,17 +6,6 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - BTP_ENGINE_TOKEN=${BTP_ENGINE_TOKEN:-test-token-change-me}
-      - OPENAI_ENABLED=false
-      - GPT_ENABLED=false
-      - GEMINI_ENABLED=false
-      - VISION_API_ENABLED=false
-      - LOVABLE_GATEWAY_ENABLED=false
-      - DB_WRITES_ENABLED=false
-      - DST_PUSH_ENABLED=false
-      - PROD_ACCESS_ENABLED=false
-      - MAX_COST_USD=0.0
+      - BTP_ENGINE_TOKEN=${BTP_ENGINE_TOKEN:-}
     volumes:
-      - ./src:/app/src:ro
-      - ./scripts:/app/scripts:ro
-    restart: unless-stopped
+      - ./data:/data

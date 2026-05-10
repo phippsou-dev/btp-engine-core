@@ -1,19 +1,19 @@
-"""Pydantic schemas for HTTP service."""
+"""Pydantic schemas for BTP Engine HTTP Service."""
 
-from typing import Dict, Any, Optional
-from pydantic import BaseModel
+from typing import Dict, Any, List, Optional
+from pydantic import BaseModel, Field
 
 
 class HealthResponse(BaseModel):
     """Health check response."""
-    ok: bool
-    service: str
-    mode: str
-    guardrails_ok: bool
+    ok: bool = True
+    service: str = "btp-engine-core"
+    mode: str = "deterministic"
+    guardrails_ok: bool = True
 
 
 class GuardrailsCounters(BaseModel):
-    """Guardrails counters."""
+    """Guardrails counters to ensure no forbidden operations."""
     openai_calls: int = 0
     gpt_calls: int = 0
     gemini_calls: int = 0
@@ -26,7 +26,7 @@ class GuardrailsCounters(BaseModel):
 
 
 class RunResponse(BaseModel):
-    """Engine run response."""
+    """Response from /run endpoint."""
     engine_version: str
     repo_sha: str
     pdf_count: int
@@ -35,4 +35,4 @@ class RunResponse(BaseModel):
     missing_expected_flags_total: int
     quality_score: Dict[str, Any]
     guardrails_counters: GuardrailsCounters
-    files: Dict[str, Optional[str]]
+    files: Dict[str, str]

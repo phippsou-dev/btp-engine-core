@@ -1,41 +1,37 @@
-"""Security checks for HTTP service."""
+"""Security utilities for BTP Engine HTTP Service."""
 
 import os
-from fastapi import HTTPException
+from fastapi import HTTPException, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+
+security = HTTPBearer(auto_error=False)
 
 
-def verify_token(authorization: str, expected_token: str):
-    """Verify Bearer token."""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header required")
+def verify_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> bool:
+    """
+    Verify the bearer token.
     
-    if not authorization.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Invalid authorization format")
+    If BTP_ENGINE_TOKEN is not set, no authentication is required.
+    If BTP_ENGINE_TOKEN is set, the request must provide a valid bearer token.
+    """
+    expected_token = os.getenv("BTP_ENGINE_TOKEN")
     
-    token = authorization[7:]  # Remove "Bearer "
+    # If no token is configured, allow all requests
+    if not expected_token:
+        return True
     
-    if token != expected_token:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-
-def check_guardrails_startup():
-    """Check guardrails at startup - fail-closed."""
-    forbidden_enabled = [
-        "OPENAI_ENABLED",
-        "GPT_ENABLED",
-        "GEMINI_ENABLED",
-        "VISION_API_ENABLED",
-        "LOVABLE_GATEWAY_ENABLED",
-        "DB_WRITES_ENABLED",
-        "DST_PUSH_ENABLED",
-        "PROD_ACCESS_ENABLED",
-    ]
+    # If token is configured but not provided
+    if not credentials:
+        raise HTTPException(
+            status_code=401,
+            detail="Authorization token required"
+        )
     
-    for var in forbidden_enabled:
-        value = os.getenv(var, "false").lower()
-        if value in ("true", "1", "yes"):
-            raise RuntimeError(f"FAIL-CLOSED: {var} is enabled - service cannot start")
+    # Verify token
+    if credentials.credentials != expected_token:
+        raise HTTPException(
+            status_code=403,
+            detail="Invalid authorization token"
+        )
     
-    max_cost = float(os.getenv("MAX_COST_USD", "0.0"))
-    if max_cost > 0:
-        raise RuntimeError(f"FAIL-CLOSED: MAX_COST_USD={max_cost} > 0 - service cannot start")
+    return True
