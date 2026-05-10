@@ -60,7 +60,7 @@ def _sha256_file(filepath: str) -> str:
     return h.hexdigest()
 
 
-def ocr_pdf_local(filepath: str, lang: str = "fra", dpi: int = 250) -> str:
+def ocr_pdf_local(filepath: str, lang: str = "fra", dpi: int = 200) -> str:
     """Run local OCR (pdftoppm + tesseract). No external API."""
     if not shutil.which("pdftoppm"):
         return ""
@@ -101,16 +101,24 @@ def extract_pdf_text(filepath: str) -> Dict:
     native_chars = len(native_text)
     page_count = meta.get("page_count", 0)
 
+    # Detect CID-dominated text (notice_securite case)
+    cid_count = len(_CID_RE.findall(native_text))
+    tokens = max(1, native_chars // 6)
+    cid_dominated = (cid_count / tokens) > 0.5
+
     ocr_executed = False
     ocr_chars = 0
     final_text = native_text
     if needs_ocr_fallback(native_text):
         ocr_text = ocr_pdf_local(filepath)
-        if ocr_text and len(ocr_text.strip()) > native_chars:
+        if ocr_text and len(ocr_text.strip()) >= 100:
             ocr_executed = True
             ocr_chars = len(ocr_text)
-            # prefer OCR text but keep native as suffix for safety
-            final_text = ocr_text + "\n\n" + native_text
+            if cid_dominated or native_chars < 100:
+                # Replace garbled native text with OCR
+                final_text = ocr_text
+            else:
+                final_text = ocr_text + "\n\n" + native_text
 
     return {
         "filename": Path(filepath).name,
@@ -121,5 +129,6 @@ def extract_pdf_text(filepath: str) -> Dict:
         "native_chars": native_chars,
         "ocr_executed": ocr_executed,
         "ocr_chars": ocr_chars,
+        "cid_count": cid_count,
         "char_count": len(final_text),
     }
