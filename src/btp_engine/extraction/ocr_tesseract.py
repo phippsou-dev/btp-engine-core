@@ -1,73 +1,34 @@
-"""OCR using local Tesseract (no Vision API)."""
+"""OCR using Tesseract."""
 
-import os
-import subprocess
-from typing import Dict, Optional
-
-try:
-    import pytesseract
-    from PIL import Image
-    TESSERACT_AVAILABLE = True
-except ImportError:
-    TESSERACT_AVAILABLE = False
+from pathlib import Path
+from typing import Optional
+import pytesseract
+from PIL import Image
 
 
-def run_ocr_tesseract(filepath: str, lang: str = "fra") -> Dict:
-    """
-    Run OCR on PDF using local Tesseract.
+class OCREngine:
+    """Perform OCR on images using Tesseract."""
     
-    Args:
-        filepath: Path to PDF file
-        lang: Tesseract language code (default: fra for French)
+    def __init__(self, lang: str = "fra+eng"):
+        self.lang = lang
+    
+    def extract(self, filepath: str) -> str:
+        """Extract text from image file."""
+        path = Path(filepath)
+        if not path.exists():
+            raise FileNotFoundError(f"Image not found: {filepath}")
         
-    Returns:
-        dict with keys: filename, text, chars, extraction_ok, error
-    """
-    result = {
-        "filename": os.path.basename(filepath),
-        "filepath": filepath,
-        "text": "",
-        "chars": 0,
-        "extraction_ok": False,
-        "error": None,
-        "method": "tesseract_ocr"
-    }
+        try:
+            image = Image.open(filepath)
+            text = pytesseract.image_to_string(image, lang=self.lang)
+            return text
+        except Exception as e:
+            raise RuntimeError(f"OCR failed: {e}")
     
-    if not os.path.exists(filepath):
-        result["error"] = f"File not found: {filepath}"
-        return result
-    
-    if not TESSERACT_AVAILABLE:
-        result["error"] = "Tesseract/pytesseract not available"
-        return result
-    
-    try:
-        # For now, simplified: would need pdftoppm to convert PDF to images first
-        # This is a placeholder - real implementation would:
-        # 1. Convert PDF pages to images with pdftoppm
-        # 2. Run Tesseract on each image
-        # 3. Combine results
-        
-        result["error"] = "OCR pipeline requires pdftoppm + tesseract (not implemented in this version)"
-        result["extraction_ok"] = False
-        
-    except Exception as e:
-        result["error"] = str(e)
-    
-    return result
-
-
-def check_tesseract_available() -> bool:
-    """Check if Tesseract is available on system."""
-    if not TESSERACT_AVAILABLE:
-        return False
-    
-    try:
-        subprocess.run(
-            ["tesseract", "--version"],
-            capture_output=True,
-            check=True
-        )
-        return True
-    except (subprocess.CalledProcessError, FileNotFoundError):
-        return False
+    def is_available(self) -> bool:
+        """Check if Tesseract is available."""
+        try:
+            pytesseract.get_tesseract_version()
+            return True
+        except Exception:
+            return False

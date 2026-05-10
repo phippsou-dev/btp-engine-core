@@ -1,68 +1,41 @@
 """Text cleaning utilities."""
 
 import re
+from typing import List
 
 
-def clean_text(text: str) -> str:
-    """
-    Clean extracted text.
+class TextCleaner:
+    """Clean and normalize extracted text."""
     
-    Args:
-        text: Raw extracted text
-        
-    Returns:
-        Cleaned text
-    """
-    if not text:
-        return ""
+    @staticmethod
+    def remove_excessive_whitespace(text: str) -> str:
+        """Remove excessive whitespace."""
+        text = re.sub(r' +', ' ', text)
+        text = re.sub(r'\n\n+', '\n\n', text)
+        return text.strip()
     
-    # Remove excessive whitespace
-    text = re.sub(r'\s+', ' ', text)
+    @staticmethod
+    def remove_page_numbers(text: str) -> str:
+        """Remove common page number patterns."""
+        text = re.sub(r'\n\d+\n', '\n', text)
+        text = re.sub(r'Page \d+ (of|/) \d+', '', text, flags=re.IGNORECASE)
+        return text
     
-    # Remove excessive newlines
-    text = re.sub(r'\n\s*\n\s*\n+', '\n\n', text)
+    @staticmethod
+    def normalize_french_chars(text: str) -> str:
+        """Normalize French characters."""
+        replacements = {
+            'œ': 'oe',
+            'æ': 'ae',
+            'Œ': 'OE',
+            'Æ': 'AE',
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+        return text
     
-    # Strip leading/trailing whitespace
-    text = text.strip()
-    
-    return text
-
-
-def extract_snippets(text: str, keywords: list, context_chars: int = 200) -> list:
-    """
-    Extract snippets around keywords.
-    
-    Args:
-        text: Full text
-        keywords: List of keywords to search for
-        context_chars: Number of characters of context on each side
-        
-    Returns:
-        List of snippets
-    """
-    snippets = []
-    text_lower = text.lower()
-    
-    for keyword in keywords:
-        keyword_lower = keyword.lower()
-        start = 0
-        
-        while True:
-            pos = text_lower.find(keyword_lower, start)
-            if pos == -1:
-                break
-            
-            snippet_start = max(0, pos - context_chars)
-            snippet_end = min(len(text), pos + len(keyword) + context_chars)
-            
-            snippet = text[snippet_start:snippet_end]
-            snippets.append({
-                "keyword": keyword,
-                "position": pos,
-                "snippet": snippet,
-                "context_chars": context_chars
-            })
-            
-            start = pos + 1
-    
-    return snippets
+    def clean(self, text: str) -> str:
+        """Apply all cleaning operations."""
+        text = self.remove_excessive_whitespace(text)
+        text = self.remove_page_numbers(text)
+        return text

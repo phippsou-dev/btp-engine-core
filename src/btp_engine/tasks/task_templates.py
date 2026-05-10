@@ -1,58 +1,68 @@
-"""Task templates for common BTP scenarios."""
+"""Task templates for different document types."""
 
-TASK_TEMPLATES = {
-    "electrical_compliance": {
-        "title": "Mise en conformité électrique",
-        "description": "Mise aux normes de l'installation électrique",
-        "dst_family": "FT26_electricite_CFO",
-        "typical_duration_days": 5,
-        "typical_cost_range": "2000-8000",
-        "requires_certification": True
-    },
+from typing import Dict, List
+
+
+class TaskTemplates:
+    """Templates for generating tasks."""
     
-    "lead_treatment": {
-        "title": "Traitement plomb",
-        "description": "Traitement des peintures au plomb selon CREP",
-        "dst_family": "FT03_curage_depose",
-        "typical_duration_days": 10,
-        "typical_cost_range": "5000-15000",
-        "requires_certification": True
-    },
+    TEMPLATES: Dict[str, List[Dict]] = {
+        "facture": [
+            {
+                "name": "Vérifier montants",
+                "priority": "high",
+                "description": "Vérifier cohérence HT/TTC/TVA",
+            },
+            {
+                "name": "Archiver facture",
+                "priority": "medium",
+                "description": "Archiver dans système comptable",
+            },
+        ],
+        "devis": [
+            {
+                "name": "Valider devis",
+                "priority": "high",
+                "description": "Valider conformité et prix",
+            },
+            {
+                "name": "Négocier tarifs",
+                "priority": "medium",
+                "description": "Négocier si nécessaire",
+            },
+        ],
+        "permis": [
+            {
+                "name": "Vérifier validité",
+                "priority": "critical",
+                "description": "Vérifier dates et conditions",
+            },
+            {
+                "name": "Archiver permis",
+                "priority": "high",
+                "description": "Archiver dans dossier chantier",
+            },
+        ],
+        "rapport": [
+            {
+                "name": "Analyser rapport",
+                "priority": "high",
+                "description": "Analyser conclusions et recommandations",
+            },
+            {
+                "name": "Planifier actions",
+                "priority": "medium",
+                "description": "Planifier actions correctives",
+            },
+        ],
+    }
     
-    "asbestos_removal": {
-        "title": "Désamiantage",
-        "description": "Retrait amiante par entreprise certifiée",
-        "dst_family": "FT03_curage_depose",
-        "typical_duration_days": 15,
-        "typical_cost_range": "10000-50000",
-        "requires_certification": True
-    },
+    @classmethod
+    def get_templates(cls, doc_type: str) -> List[Dict]:
+        """Get task templates for document type."""
+        return cls.TEMPLATES.get(doc_type, [])
     
-    "humidity_treatment": {
-        "title": "Traitement humidité",
-        "description": "Traitement infiltrations et humidité",
-        "dst_family": "FT10_etancheite",
-        "typical_duration_days": 7,
-        "typical_cost_range": "3000-12000",
-        "requires_certification": False
-    },
-    
-    "structural_repair": {
-        "title": "Réparation structure",
-        "description": "Réparation/renforcement structure",
-        "dst_family": "FT06_structure_gros_oeuvre",
-        "typical_duration_days": 20,
-        "typical_cost_range": "15000-100000",
-        "requires_certification": False
-    },
-}
-
-
-def get_task_template(template_name: str) -> dict:
-    """Get task template by name."""
-    return TASK_TEMPLATES.get(template_name, {})
-
-
-def list_templates() -> list:
-    """List all available templates."""
-    return list(TASK_TEMPLATES.keys())
+    @classmethod
+    def all_types(cls) -> List[str]:
+        """Get all document types with templates."""
+        return list(cls.TEMPLATES.keys())
