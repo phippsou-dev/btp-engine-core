@@ -89,6 +89,23 @@ def main() -> int:
         flags_by_doc[doc["filename"]] = sorted(flags)
         all_flags.update(flags)
 
+    # Per-doc audit (expected vs found)
+    from btp_engine.analysis.flag_detector import compute_flag_audit
+    per_doc = []
+    for doc, ext in zip(documents, extraction_report):
+        fname = doc["filename"]
+        found = set(flags_by_doc.get(fname, []))
+        audit = compute_flag_audit(fname, found, doc.get("text", ""))
+        per_doc.append({
+            "filename": fname,
+            "classified_as": doc.get("class"),
+            "ocr_executed": ext["ocr_executed"],
+            "ocr_chars": ext["ocr_chars"],
+            "critical_flags_found": sorted(found),
+            "missing_expected_flags": audit["missing_expected_flags"],
+            "optional_absent_from_source": audit["optional_absent_from_source"],
+        })
+
     print(f"Detected {len(all_problems)} problems, {len(all_flags)} flags")
 
     tasks = generate_tasks(all_problems, all_flags, documents)
@@ -118,6 +135,7 @@ def main() -> int:
     generate_json_report(dst_mapping, output_dir / "dst_mapping_report.json")
     generate_json_report(quality, output_dir / "quality_score.json")
     generate_json_report(guardrails, output_dir / "guardrails_report.json")
+    generate_json_report({"per_doc": per_doc}, output_dir / "per_doc.json")
     generate_markdown_report(documents, tasks, quality, guardrails, output_dir / "final_report.md")
 
     print(f"Pipeline complete. Output: {output_dir} / cost: ${cost_tracker.get_cost():.2f}")
