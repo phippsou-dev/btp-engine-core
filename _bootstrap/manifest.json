@@ -1,0 +1,57 @@
+{
+  "archive_name": "btp_engine_core.tar.gz",
+  "archive_sha256": "d1d12265096049109eafee6cd1c434c83de3bf07b1816da4647790f8fb245f00",
+  "base64_total_bytes": 58908,
+  "chunk_size": 8000,
+  "chunk_count": 8,
+  "chunks": [
+    {
+      "name": "btp_engine_core.part_000",
+      "index": 0,
+      "size": 8000,
+      "sha256": "a05df2eb2ce51d085416a77616cd8efaf1fb1a191f072e302417c09b6a66840e"
+    },
+    {
+      "name": "btp_engine_core.part_001",
+      "index": 1,
+      "size": 8000,
+      "sha256": "24228507f3f54e77bfa37b5f7fc65cfba82f5d88a318aaadc512dea0020f263b"
+    },
+    {
+      "name": "btp_engine_core.part_002",
+      "index": 2,
+      "size": 8000,
+      "sha256": "88e33ce449652986389303ce336a3a12f8047de8252bb58eaf8a8c462f157091"
+    },
+    {
+      "name": "btp_engine_core.part_003",
+      "index": 3,
+      "size": 8000,
+      "sha256": "39a3df3224dad85c1db18be6d99fc754c4e89623925829b7423db8f776107fd9"
+    },
+    {
+      "name": "btp_engine_core.part_004",
+      "index": 4,
+      "size": 8000,
+      "sha256": "7ddec748d1070a263f289dd56da19ed5e34fa84b2a70c4f1721cab7a56b39dbb"
+    },
+    {
+      "name": "btp_engine_core.part_005",
+      "index": 5,
+      "size": 8000,
+      "sha256": "524b796a45ed8c0a0a329990727659422d4259b34a6088880196b26d68ac7c9d"
+    },
+    {
+      "name": "btp_engine_core.part_006",
+      "index": 6,
+      "size": 8000,
+      "sha256": "8d0fa187f6a0df44b8d7bff0532d32b27c000ffae391cb132086ffa41de3ae80"
+    },
+    {
+      "name": "btp_engine_core.part_007",
+      "index": 7,
+      "size": 2908,
+      "sha256": "5219115ef7a1db3a04eb1cb71e3685c6e512e08156de8845108e3612e7c24fc4"
+    }
+  ]
+}
