@@ -2,6 +2,8 @@
 
 import asyncio
 import shutil
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -14,13 +16,40 @@ from .schemas import (
 )
 from .security import verify_token
 from .runner import extract_uploaded_file, run_engine
-from .jobs import job_manager
-from .worker import process_job
+from .jobs import job_manager, job_queue
+from .worker import worker_loop
+
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager."""
+    # Startup
+    logger.info("Starting BTP Engine worker...")
+    worker_task = asyncio.create_task(worker_loop())
+    
+    yield
+    
+    # Shutdown
+    logger.info("Shutting down BTP Engine worker...")
+    worker_task.cancel()
+    try:
+        await worker_task
+    except asyncio.CancelledError:
+        pass
+
 
 app = FastAPI(
     title="BTP Engine Core HTTP Service",
     description="HTTP service for BTP Engine integration with MyHome/Lovable",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 
@@ -107,6 +136,8 @@ async def start_job(
     Returns:
         Job created confirmation
     """
+    logger.info(f"Job received: {request.run_id}")
+    
     # Validate mode
     if request.mode != "dry_run":
         raise HTTPException(
@@ -126,8 +157,9 @@ async def start_job(
         project_id=request.project_id
     )
     
-    # Start background task
-    asyncio.create_task(process_job(request.run_id))
+    # Enqueue job
+    await job_queue.put(request.run_id)
+    logger.info(f"Job queued: {request.run_id}")
     
     return JobStartResponse(run_id=request.run_id, status="queued")
 
@@ -154,5 +186,8 @@ async def get_job_status(
     return JobStatusResponse(
         run_id=run_id,
         status=job.status,
-        error=job.error_message
+        error=job.error_message,
+        updated_at=job.updated_at.isoformat() if job.updated_at else None,
+        callback_status=job.callback_status,
+        callback_http_status=job.callback_http_status
     )
