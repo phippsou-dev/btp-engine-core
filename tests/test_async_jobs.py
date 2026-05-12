@@ -1,4 +1,4 @@
-"""Tests for async job endpoints."""
+"""Tests for async job endpoints with proper worker queue."""
 
 import os
 import asyncio
@@ -9,7 +9,7 @@ from pathlib import Path
 import tempfile
 
 from service.app import app
-from service.jobs import job_manager, JobStatus
+from service.jobs import job_manager, JobStatus, job_queue
 
 client = TestClient(app)
 
@@ -18,32 +18,28 @@ def test_jobs_start_returns_immediately():
     """Test POST /jobs/start returns in less than 2 seconds."""
     import time
     
-    with patch("service.app.process_job") as mock_process:
-        mock_process.return_value = asyncio.Future()
-        mock_process.return_value.set_result(None)
-        
-        start = time.time()
-        response = client.post(
-            "/jobs/start",
-            json={
-                "run_id": "test-run-123",
-                "source_url": "https://example.com/test.pdf",
-                "source_filename": "test.pdf",
-                "mode": "dry_run",
-                "callback_url": "https://example.com/callback",
-                "callback_token": "test-token",
-                "workspace_id": "ws-123",
-                "project_id": "proj-456"
-            }
-        )
-        elapsed = time.time() - start
-        
-        assert response.status_code == 200
-        assert elapsed < 2.0
-        data = response.json()
-        assert data["ok"] is True
-        assert data["run_id"] == "test-run-123"
-        assert data["status"] == "queued"
+    start = time.time()
+    response = client.post(
+        "/jobs/start",
+        json={
+            "run_id": "test-run-immediate",
+            "source_url": "https://example.com/test.pdf",
+            "source_filename": "test.pdf",
+            "mode": "dry_run",
+            "callback_url": "https://example.com/callback",
+            "callback_token": "test-token",
+            "workspace_id": "ws-123",
+            "project_id": "proj-456"
+        }
+    )
+    elapsed = time.time() - start
+    
+    assert response.status_code == 200
+    assert elapsed < 2.0
+    data = response.json()
+    assert data["ok"] is True
+    assert data["run_id"] == "test-run-immediate"
+    assert data["status"] == "queued"
 
 
 def test_jobs_start_requires_auth():
@@ -52,7 +48,7 @@ def test_jobs_start_requires_auth():
         response = client.post(
             "/jobs/start",
             json={
-                "run_id": "test-run-123",
+                "run_id": "test-run-auth",
                 "source_url": "https://example.com/test.pdf",
                 "source_filename": "test.pdf",
                 "mode": "dry_run",
@@ -68,7 +64,7 @@ def test_jobs_start_refuses_non_dry_run():
     response = client.post(
         "/jobs/start",
         json={
-            "run_id": "test-run-123",
+            "run_id": "test-run-mode",
             "source_url": "https://example.com/test.pdf",
             "source_filename": "test.pdf",
             "mode": "production",
@@ -84,7 +80,7 @@ def test_jobs_get_status():
     """Test GET /jobs/{run_id} returns status."""
     # Create a job
     job = job_manager.create_job(
-        run_id="test-run-456",
+        run_id="test-run-status",
         source_url="https://example.com/test.pdf",
         source_filename="test.pdf",
         mode="dry_run",
@@ -92,19 +88,46 @@ def test_jobs_get_status():
         callback_token="test-token"
     )
     
-    response = client.get("/jobs/test-run-456")
+    response = client.get("/jobs/test-run-status")
     
     assert response.status_code == 200
     data = response.json()
     assert data["ok"] is True
-    assert data["run_id"] == "test-run-456"
+    assert data["run_id"] == "test-run-status"
     assert data["status"] == "queued"
     assert data["error"] is None
 
 
+def test_jobs_get_status_includes_callback_info():
+    """Test GET /jobs/{run_id} includes callback status."""
+    # Create a job and update with callback info
+    job = job_manager.create_job(
+        run_id="test-run-callback-info",
+        source_url="https://example.com/test.pdf",
+        source_filename="test.pdf",
+        mode="dry_run",
+        callback_url="https://example.com/callback",
+        callback_token="test-token"
+    )
+    job_manager.update_status(
+        "test-run-callback-info",
+        JobStatus.SUCCEEDED,
+        callback_status="success",
+        callback_http_status=200
+    )
+    
+    response = client.get("/jobs/test-run-callback-info")
+    
+    assert response.status_code == 200
+    data = response.json()
+    assert data["callback_status"] == "success"
+    assert data["callback_http_status"] == 200
+    assert data["updated_at"] is not None
+
+
 def test_jobs_get_status_not_found():
     """Test GET /jobs/{run_id} returns 404 for unknown job."""
-    response = client.get("/jobs/non-existent-job")
+    response = client.get("/jobs/non-existent-job-xyz")
     assert response.status_code == 404
 
 
@@ -145,9 +168,11 @@ async def test_worker_success_callback():
             Path(tempfile.mkdtemp())
         )
         
+        mock_callback.return_value = 200
+        
         # Create job
         job = job_manager.create_job(
-            run_id="test-success",
+            run_id="test-worker-success",
             source_url="https://example.com/test.pdf",
             source_filename="test.pdf",
             mode="dry_run",
@@ -156,7 +181,7 @@ async def test_worker_success_callback():
         )
         
         # Process job
-        await process_job("test-success")
+        await process_job("test-worker-success")
         
         # Verify callback was called with success
         assert mock_callback.called
@@ -164,9 +189,15 @@ async def test_worker_success_callback():
         assert call_args[0][0] == "https://example.com/callback"
         assert call_args[0][1] == "callback-token"
         payload = call_args[0][2]
-        assert payload["run_id"] == "test-success"
+        assert payload["run_id"] == "test-worker-success"
         assert payload["status"] == "succeeded"
         assert payload["guardrails_counters"]["openai_calls"] == 0
+        
+        # Verify job status
+        job = job_manager.get_job("test-worker-success")
+        assert job.status == JobStatus.SUCCEEDED
+        assert job.callback_status == "success"
+        assert job.callback_http_status == 200
 
 
 @pytest.mark.asyncio
@@ -179,10 +210,11 @@ async def test_worker_failed_callback():
          patch("service.worker.send_callback", new_callable=AsyncMock) as mock_callback:
         
         mock_download.side_effect = Exception("Download failed")
+        mock_callback.return_value = 200
         
         # Create job
         job = job_manager.create_job(
-            run_id="test-failed",
+            run_id="test-worker-failed",
             source_url="https://example.com/test.pdf",
             source_filename="test.pdf",
             mode="dry_run",
@@ -191,17 +223,22 @@ async def test_worker_failed_callback():
         )
         
         # Process job
-        await process_job("test-failed")
+        await process_job("test-worker-failed")
         
         # Verify callback was called with failure
         assert mock_callback.called
         call_args = mock_callback.call_args
         payload = call_args[0][2]
-        assert payload["run_id"] == "test-failed"
+        assert payload["run_id"] == "test-worker-failed"
         assert payload["status"] == "failed"
         assert "Download failed" in payload["error_message"]
         assert payload["guardrails_counters"]["openai_calls"] == 0
         assert payload["guardrails_counters"]["cost_usd"] == 0.0
+        
+        # Verify job status
+        job = job_manager.get_job("test-worker-failed")
+        assert job.status == JobStatus.FAILED
+        assert job.callback_status == "failed_posted"
 
 
 def test_jobs_guardrails_zero():
