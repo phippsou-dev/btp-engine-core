@@ -36,3 +36,30 @@ class RunResponse(BaseModel):
     quality_score: Dict[str, Any]
     guardrails_counters: GuardrailsCounters
     files: Dict[str, str]
+
+
+class JobStartRequest(BaseModel):
+    """Request to start an async job."""
+    run_id: str
+    source_url: str
+    source_filename: str
+    mode: str = "dry_run"
+    callback_url: str
+    callback_token: str
+    workspace_id: Optional[str] = None
+    project_id: Optional[str] = None
+
+
+class JobStartResponse(BaseModel):
+    """Response from job start."""
+    ok: bool = True
+    run_id: str
+    status: str = "queued"
+
+
+class JobStatusResponse(BaseModel):
+    """Response from job status check."""
+    ok: bool = True
+    run_id: str
+    status: str
+    error: Optional[str] = None

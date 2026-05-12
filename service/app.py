@@ -1,12 +1,21 @@
 """FastAPI application for BTP Engine HTTP Service."""
 
+import asyncio
 import shutil
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from fastapi.responses import JSONResponse
 
-from .schemas import HealthResponse, RunResponse
+from .schemas import (
+    HealthResponse, 
+    RunResponse, 
+    JobStartRequest, 
+    JobStartResponse,
+    JobStatusResponse
+)
 from .security import verify_token
 from .runner import extract_uploaded_file, run_engine
+from .jobs import job_manager
+from .worker import process_job
 
 app = FastAPI(
     title="BTP Engine Core HTTP Service",
@@ -82,3 +91,68 @@ async def run(
             shutil.rmtree(tmp_input, ignore_errors=True)
         if tmp_output and tmp_output.exists():
             shutil.rmtree(tmp_output, ignore_errors=True)
+
+
+@app.post("/jobs/start", response_model=JobStartResponse)
+async def start_job(
+    request: JobStartRequest,
+    _authenticated: bool = Depends(verify_token)
+):
+    """
+    Start an async job.
+    
+    Args:
+        request: Job start request with source_url, callback_url, etc.
+        
+    Returns:
+        Job created confirmation
+    """
+    # Validate mode
+    if request.mode != "dry_run":
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only 'dry_run' mode is allowed, got: {request.mode}"
+        )
+    
+    # Create job
+    job = job_manager.create_job(
+        run_id=request.run_id,
+        source_url=request.source_url,
+        source_filename=request.source_filename,
+        mode=request.mode,
+        callback_url=request.callback_url,
+        callback_token=request.callback_token,
+        workspace_id=request.workspace_id,
+        project_id=request.project_id
+    )
+    
+    # Start background task
+    asyncio.create_task(process_job(request.run_id))
+    
+    return JobStartResponse(run_id=request.run_id, status="queued")
+
+
+@app.get("/jobs/{run_id}", response_model=JobStatusResponse)
+async def get_job_status(
+    run_id: str,
+    _authenticated: bool = Depends(verify_token)
+):
+    """
+    Get job status.
+    
+    Args:
+        run_id: Job run ID
+        
+    Returns:
+        Job status
+    """
+    job = job_manager.get_job(run_id)
+    
+    if not job:
+        raise HTTPException(status_code=404, detail=f"Job {run_id} not found")
+    
+    return JobStatusResponse(
+        run_id=run_id,
+        status=job.status,
+        error=job.error_message
+    )
