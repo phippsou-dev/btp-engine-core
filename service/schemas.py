@@ -63,3 +63,6 @@ class JobStatusResponse(BaseModel):
     run_id: str
     status: str
     error: Optional[str] = None
+    updated_at: Optional[str] = None
+    callback_status: Optional[str] = None
+    callback_http_status: Optional[int] = None
